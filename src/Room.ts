@@ -1,30 +1,49 @@
 import { Socket } from "socket.io/dist/socket";
+import ScheduleableEvent from "./ScheduleableEvent";
 
 type Client = {
   socket: Socket;
   username: string;
 };
 
-const SIXTY_MINUTES_IN_MS = 10 * 60 * 1000;
+const TEN_MINUTES_IN_MS = 10 * 60 * 1000;
+const THIRTY_SECONDS_IN_MS = 30 * 1000;
+const MIN_CLIENTS = 1;
 
 export class Room {
   constructor(public readonly roomID: string) {}
   public readonly clients = new Map<string, Client>();
-  private roomDestructionTimerID: NodeJS.Timeout = null;
+  private countdown = new ScheduleableEvent(() => {
+    this.startRoom();
+  });
+  private destroyRoom = new ScheduleableEvent(() => {
+    console.log("Destroying room", this.roomID, "because of inactivity");
+    delete rooms[this.roomID];
+  });
+  private drawingPlayerID = null as string;
+  private roundCount = 0;
+  private roundNumber = 0;
+  private gameState = "waiting";
 
-  private startRoomDestructionTimer() {
-    if (this.roomDestructionTimerID == null) {
-      setTimeout(() => {
-        console.log("Destroying room", this.roomID, "because of inactivity");
-        delete rooms[this.roomID];
-      }, SIXTY_MINUTES_IN_MS);
+  private startRoom() {
+    this.broadcastToAll("game-started", this.roundCount);
+  }
+
+  private cancelCountdown() {
+    if (this.countdown.cancel()) {
+      this.broadcastToAll("game-start-cancelled");
     }
   }
 
-  private stopRoomDestructionTimer() {
-    if (this.roomDestructionTimerID != null) {
-      clearTimeout(this.roomDestructionTimerID);
+  private startCountdown() {
+    if (this.countdown.schedule(THIRTY_SECONDS_IN_MS)) {
+      const scheduledStartTime = new Date().getTime() + THIRTY_SECONDS_IN_MS;
+      this.broadcastToAll("game-will-start", scheduledStartTime);
     }
+  }
+
+  private broadcastToAll(event: string, ...args: any[]) {
+    this.clients.forEach((client) => client.socket.emit(event, ...args));
   }
 
   private emit(event: string, ...args: any[]) {
@@ -36,7 +55,7 @@ export class Room {
   join(socket: Socket, username: string) {
     this.clients.set(socket.id, { socket, username });
     this.emit("client joined", socket.id, username);
-    this.stopRoomDestructionTimer();
+    this.destroyRoom.cancel();
 
     this.broadcastAs(socket.id, "player-joined", username);
     const roster = [];
@@ -46,6 +65,10 @@ export class Room {
       }
     });
     socket.emit("player-list", roster);
+
+    if (this.clients.size >= MIN_CLIENTS) {
+      this.startCountdown();
+    }
   }
 
   leave(socket: Socket) {
@@ -53,7 +76,9 @@ export class Room {
     this.emit("client left", socket.id);
 
     if (this.clients.size === 0) {
-      this.startRoomDestructionTimer();
+      this.destroyRoom.schedule(TEN_MINUTES_IN_MS);
+    } else if (this.clients.size < MIN_CLIENTS) {
+      this.cancelCountdown();
     }
   }
 
@@ -67,11 +92,15 @@ export class Room {
 }
 
 let roomIDCounter = 0;
-export function createRoom() {
-  const roomID = "R" + roomIDCounter;
-  rooms[roomID] = new Room(roomID);
+/**
+ * Creates a new room.
+ * @returns {string} The room ID
+ */
+export function createRoom(): string {
+  const roomID = roomIDCounter;
+  rooms[roomID] = new Room(String(roomID));
   roomIDCounter += 1;
-  return roomID;
+  return String(roomID);
 }
 
 export const rooms: Record<string, Room> = {};
