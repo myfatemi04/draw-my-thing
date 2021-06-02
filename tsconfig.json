@@ -2,7 +2,10 @@
   "compilerOptions": {
     "esModuleInterop": true,
     "downlevelIteration": true,
-    "outDir": "dist"
+    "outDir": "dist",
+    "target": "ES6",
+    "moduleResolution": "node",
+    "module": "CommonJS"
   },
   "include": ["src"]
 }
