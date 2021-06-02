@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "main": "dist/server.js",
   "license": "MIT",
+  "scripts": {
+    "dev": "concurrently \"npx nodemon\" \"tsc -w\""
+  },
   "dependencies": {
     "@types/node": "^15.3.1",
     "socket.io": "^4.1.2",
