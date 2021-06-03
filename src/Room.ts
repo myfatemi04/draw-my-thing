@@ -6,8 +6,8 @@ type Client = {
   username: string;
 };
 
-const TEN_MINUTES_IN_MS = 10 * 60 * 1000;
-const THIRTY_SECONDS_IN_MS = 30 * 1000;
+const TEN_MINUTES_IN_MS = 60 * 10 * 1000;
+const TEN_SECONDS_IN_MS = 10 * 1000;
 const MIN_CLIENTS = 1;
 
 export class Room {
@@ -36,8 +36,8 @@ export class Room {
   }
 
   private startCountdown() {
-    if (this.countdown.schedule(THIRTY_SECONDS_IN_MS)) {
-      const scheduledStartTime = new Date().getTime() + THIRTY_SECONDS_IN_MS;
+    if (this.countdown.schedule(TEN_SECONDS_IN_MS)) {
+      const scheduledStartTime = new Date().getTime() + TEN_SECONDS_IN_MS;
       this.broadcastToAll("game-will-start", scheduledStartTime);
     }
   }
